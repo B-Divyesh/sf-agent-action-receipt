@@ -1,6 +1,6 @@
 {
   "name": "@sociobot/agent-action-receipt",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Signed, privacy-preserving hash-chain receipts for consequential agent tool calls.",
   "license": "MIT",
   "type": "module",
@@ -27,9 +27,11 @@
     "build": "npm run build:lib && npm run build:site",
     "build:lib": "rm -rf dist/esm dist/cjs && tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && node scripts/rename-cjs.mjs",
     "build:site": "node scripts/build-site.mjs",
-    "test": "npm run build:lib && node --test test/*.test.mjs",
+    "test": "npm run build:lib && node --test test/ledger.test.mjs",
+    "test:browser": "npm run build:site && node --test test/site.test.mjs",
     "dev": "npm run build:site && node scripts/serve.mjs",
-    "check": "tsc --noEmit -p tsconfig.json"
+    "check": "tsc --noEmit -p tsconfig.json",
+    "lint": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",

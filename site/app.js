@@ -43,6 +43,21 @@ document.querySelector('.theme').addEventListener('click', (event) => {
   document.body.dataset.theme = next; event.currentTarget.setAttribute('aria-pressed', String(next === 'dark'));
 });
 document.querySelector('.copy').addEventListener('click', async (event) => {
-  await navigator.clipboard?.writeText(event.currentTarget.dataset.copy); event.currentTarget.textContent = 'Copied'; setTimeout(() => event.currentTarget.textContent = 'Copy install command', 1200);
+  const button = event.currentTarget;
+  const value = button.dataset.copy;
+  let copied = false;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      copied = true;
+    } else {
+      const fallback = document.createElement('textarea');
+      fallback.value = value; fallback.setAttribute('readonly', '');
+      fallback.style.cssText = 'position:fixed;opacity:0'; document.body.append(fallback);
+      fallback.select(); copied = document.execCommand('copy'); fallback.remove();
+    }
+  } catch { copied = false; }
+  button.textContent = copied ? 'Copied' : 'Copy unavailable';
+  setTimeout(() => button.textContent = 'Copy install command', 1200);
 });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

@@ -32,7 +32,7 @@
       <span>Make that split explicit, instead of reconstructing it after an incident.</span>
     </section>
     <section id="protocol" class="protocol section" aria-labelledby="protocol-title">
-      <div class="section-heading"><p class="eyebrow">The protocol</p><h2 id="protocol-title">Two slips, one accountable action.</h2><p>A prepared receipt is filed before the tool runs. A signed final receipt follows—or an unresolved outbox item does.</p></div>
+      <div class="section-heading"><p class="eyebrow">The protocol</p><h2 id="protocol-title">Two slips, one accountable action.</h2><p>A prepared receipt is filed before the tool runs. A signed final receipt follows—or a durable unresolved outbox item does.</p></div>
       <ol class="steps">
         <li><span class="step-no">01</span><h3>Prepare</h3><p>Hash the authority and arguments; append a signed intent receipt before the side effect.</p></li>
         <li><span class="step-no">02</span><h3>Execute</h3><p>Run your tool unchanged. Results and failures become hashes, not raw payloads.</p></li>

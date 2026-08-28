@@ -1,5 +1,5 @@
-const CACHE = 'agent-action-receipt-v1';
-const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/privacy.html', '/terms.html', '/assets/receipt-diorama.webp'];
+const CACHE = '__CACHE_NAME__';
+const SHELL = __SHELL__;
 self.addEventListener('install', (event) => event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', (event) => {

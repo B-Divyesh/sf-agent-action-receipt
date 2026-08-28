@@ -7,8 +7,9 @@ without storing prompts, raw arguments, or raw results in the receipt.
 
 It is deliberately not an orchestration framework or hosted ledger. A receipt
 proves what its signing key recorded; it does not by itself prove a remote
-service actually performed the claimed side effect. Use the included outbox to
-make a failed receipt write explicit instead of silently losing the action.
+service actually performed the claimed side effect. Supply a durable receipt
+store to make a failed final write explicit across process restarts instead of
+silently losing the action.
 
 ## Install
 
@@ -19,7 +20,7 @@ npm install @sociobot/agent-action-receipt
 ## Use it
 
 ```ts
-import { createEd25519Signer, createReceiptLedger, verifyBundle } from '@sociobot/agent-action-receipt';
+import { ReceiptLedger, createEd25519Signer, createReceiptLedger, verifyBundle } from '@sociobot/agent-action-receipt';
 
 const signer = await createEd25519Signer(); // persist key material in your OS/KMS integration
 const ledger = createReceiptLedger({ signer, actor: 'deploy-agent' });
@@ -38,12 +39,32 @@ console.log(ledger.verify());       // { ok: true, ... }
 ```
 
 The pre-execution receipt is appended before `run`. A final success/failure
-receipt is appended after it. If persistence rejects a final receipt, the
-action is returned with an explicit unresolved outbox item. Drain it later:
+receipt is appended after it. Calls to `execute()` on one ledger are serialized
+through the entire action, so each ledger has one verifiable total order.
+
+For restart-safe final-write recovery, implement all three methods of
+`ReceiptStore` using your database transaction or idempotent write primitive:
 
 ```ts
-await ledger.drainOutbox();
+const store = {
+  append: async (receipt) => { /* durably insert receipt by receipt.id */ },
+  saveOutbox: async (item) => { /* durably insert unresolved item */ },
+  resolveOutbox: async (item) => {
+    /* atomically insert item.receipt and delete the matching outbox item */
+  },
+  load: async () => ({ receipts: [], unresolvedOutbox: [] })
+};
+
+const ledger = await ReceiptLedger.restore({ signer, actor: 'deploy-agent', store });
+const repaired = await ledger.drainOutbox();
 ```
+
+`ReceiptLedger.restore()` requires a `RecoverableReceiptStore` (a receipt store
+with `load`). It rejects a malformed stored chain before a new action can run.
+If final receipt persistence fails, `saveOutbox` is attempted before the action
+is returned with `unresolvedOutbox`. If both writes fail, the library throws
+`OutboxPersistenceError` containing the signed receipt that needs operator
+reconciliation; it never reports a durable outbox item it could not save.
 
 Export only the evidence another party needs; arguments and results remain
 hashed, and redacted views are opt-in:
@@ -57,10 +78,10 @@ const verified = await verifyBundle(bundle);
 
 Sequence numbers give one ledger a total order. They do not establish a global
 order across processes. `execute` cannot make an arbitrary remote tool and a
-receipt store atomic, so it cannot promise exactly once. It guarantees that a
-successful `run` returns either a verifiable final receipt or a surfaced
-unresolved outbox item. Store keys with your OS keychain or KMS; the package
-only accepts a signer and never writes private keys.
+receipt store atomic, so it cannot promise exactly once. With a durable store,
+a successful `run` returns either a verifiable final receipt or a durably
+surfaced unresolved outbox item. Store keys with your OS keychain or KMS; the
+package only accepts a signer and never writes private keys.
 
 ## Local development
 
