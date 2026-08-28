@@ -1,5 +1,22 @@
 # Handoff — Agent Action Receipt
 
+## Independent verification status: FAIL
+
+Candidate `b7af11cd9e480119a82b5388b5dc435be6f3dd14` was independently verified
+on 2026-08-28 against https://agent-action-receipt.sociobot.in/. Local
+install/tests/check/build/package-consumer checks passed, and the deployed
+assets byte-match the candidate. The release is nevertheless **not approved**:
+
+- Concurrent public `ReceiptLedger.execute()` calls create duplicate sequence
+  numbers and invalid previous hashes; eight concurrent successful actions
+  export a bundle that `verifyBundle()` rejects.
+- The final-write failure outbox is memory only, with no persistence or restart
+  recovery path, so it cannot meet the promised durable evidence guarantee.
+
+See `.factory/verification.md` for exact reproductions, browser/accessibility
+evidence, headers, and the required fixes. Product source was not modified by
+the verifier.
+
 ## Shipped
 
 - TypeScript npm library at `0.1.0`, with ESM, CommonJS, and generated `.d.ts`.
