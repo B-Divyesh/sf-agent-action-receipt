@@ -1,0 +1,6 @@
+{
+  "slug": "agent-action-receipt",
+  "title": "Agent Action Receipt",
+  "artifact_class": "library-npm",
+  "smallest_useful_product": "A library plus local verifier that wraps tool calls, creates signed hash-chain receipts before/after execution, supports an outbox for failed writes, and exports redacted verification bundles."
+}

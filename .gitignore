@@ -3,4 +3,5 @@ dist/
 .env
 *.log
 graphify-out/
+.factory/evidence/
 .DS_Store

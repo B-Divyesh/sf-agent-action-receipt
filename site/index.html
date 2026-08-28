@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Signed, privacy-preserving receipts for consequential agent actions.">
+  <title>Agent Action Receipt — proof-shaped tool evidence</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="masthead">
+    <a class="wordmark" href="/" aria-label="Agent Action Receipt home"><span aria-hidden="true">▰</span> Agent Action Receipt</a>
+    <nav aria-label="Primary navigation"><a href="#protocol">Protocol</a><a href="#demo">Live demo</a><a href="#install">Install</a><button class="theme" type="button" aria-pressed="false" aria-label="Switch color theme">◐</button></nav>
+  </header>
+  <main id="main">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow">A small proof protocol for real tool access</p>
+        <h1 id="hero-title">A receipt for every action that matters.</h1>
+        <p class="lede">Bind the request, authority, outcome, and signing key into a hash-chained record—without retaining raw tool arguments or results.</p>
+        <div class="actions"><a class="button primary" href="#install">Install the library</a><a class="button quiet" href="#demo">Try a receipt <span aria-hidden="true">↓</span></a></div>
+        <p class="micro">Local-first · no prompts stored · no hosted ledger · MIT</p>
+      </div>
+      <figure class="diorama">
+        <img src="assets/receipt-diorama.webp" width="1536" height="1024" fetchpriority="high" alt="Paper-cut layers show an action card becoming a sealed, linked receipt.">
+        <figcaption><span class="seal" aria-hidden="true">✓</span> Every layer carries forward.</figcaption>
+      </figure>
+    </section>
+    <section class="claim" aria-label="The reliability problem">
+      <p>“The tool may have succeeded. The audit log may have failed.”</p>
+      <span>Make that split explicit, instead of reconstructing it after an incident.</span>
+    </section>
+    <section id="protocol" class="protocol section" aria-labelledby="protocol-title">
+      <div class="section-heading"><p class="eyebrow">The protocol</p><h2 id="protocol-title">Two slips, one accountable action.</h2><p>A prepared receipt is filed before the tool runs. A signed final receipt follows—or an unresolved outbox item does.</p></div>
+      <ol class="steps">
+        <li><span class="step-no">01</span><h3>Prepare</h3><p>Hash the authority and arguments; append a signed intent receipt before the side effect.</p></li>
+        <li><span class="step-no">02</span><h3>Execute</h3><p>Run your tool unchanged. Results and failures become hashes, not raw payloads.</p></li>
+        <li><span class="step-no">03</span><h3>Finalize</h3><p>Append the outcome. If persistence fails after success, surface a durable outbox item.</p></li>
+      </ol>
+    </section>
+    <section id="demo" class="demo section" aria-labelledby="demo-title">
+      <div class="demo-intro"><p class="eyebrow">Browser-only sandbox</p><h2 id="demo-title">File a sample action.</h2><p>Nothing leaves this page. The sample records only hashes in memory, then verifies the linked chain.</p></div>
+      <div class="demo-grid">
+        <form id="action-form" class="action-card">
+          <label for="tool">Tool name</label><input id="tool" name="tool" value="deploy.release" required>
+          <label for="authority">Authority grant</label><input id="authority" name="authority" value="release-approval: 8472" required>
+          <label for="result">Outcome</label><select id="result" name="result"><option value="succeeded">Succeeded</option><option value="failed">Failed</option><option value="outbox">Succeeded, final write offline</option></select>
+          <button class="button primary" type="submit">Create receipt</button>
+          <p class="form-status" id="form-status" aria-live="polite">Ready to file a new action.</p>
+        </form>
+        <div class="receipt-area" aria-live="polite" aria-label="Sample receipt chain">
+          <div class="receipt-empty" id="empty-state"><span aria-hidden="true">⌁</span><strong>No receipts yet</strong><p>File a sample action to see its two linked slips.</p></div>
+          <div id="receipts" class="receipts" hidden></div><div id="verification" class="verification" hidden></div>
+        </div>
+      </div>
+      <p class="offline-note" id="offline-note" hidden><strong>Offline:</strong> this demo remains local. A production store should retain its outbox and retry when connectivity returns.</p>
+    </section>
+    <section id="install" class="install section" aria-labelledby="install-title">
+      <div><p class="eyebrow">One small surface</p><h2 id="install-title">Wrap the call—not your whole agent.</h2><p>Bring your own Ed25519 signer backed by an OS keychain or KMS. The package never handles private-key storage.</p></div>
+      <div class="code-block"><button class="copy" type="button" data-copy="npm install @sociobot/agent-action-receipt">Copy install command</button><pre><code>npm install @sociobot/agent-action-receipt
+
+const ledger = createReceiptLedger({ signer, actor });
+const action = await ledger.execute({ tool, authority, args, run });
+
+await ledger.drainOutbox();
+verifyBundle(ledger.exportBundle());</code></pre></div>
+    </section>
+    <section class="limits section" aria-labelledby="limits-title"><div><p class="eyebrow">Honest boundaries</p><h2 id="limits-title">Evidence, not magic.</h2></div><ul><li><strong>One ledger, one order.</strong> Sequence numbers do not create global ordering across processes.</li><li><strong>No exactly-once claim.</strong> Remote tool state and receipt persistence are separate systems.</li><li><strong>Signed self-attestation.</strong> A receipt proves what its key recorded; pair it with an external witness where needed.</li></ul></section>
+  </main>
+  <footer><span>© 2026 Param Factory</span><nav aria-label="Footer"><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="https://github.com/B-Divyesh/sf-agent-action-receipt">Source</a></nav></footer>
+  <script src="app.js"></script>
+</body>
+</html>
