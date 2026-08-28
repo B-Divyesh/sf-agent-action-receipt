@@ -97,6 +97,20 @@ npm pack               # ready-to-publish tarball; do not publish from this repo
 The static demo runs fully in the browser and stores its sample receipt chain
 only in memory.
 
+## Deploy the documentation site
+
+Build `dist/site` and hand that directory to the factory's static deployment
+job. The factory owns the cloud credentials and runs:
+
+```sh
+npm run build
+/opt/fleet/lib/deploy-static.sh agent-action-receipt dist/site
+```
+
+The deployable site includes Azure Static Web Apps response policy in
+`staticwebapp.config.json`, including CSP, Permissions-Policy, no-cache HTML,
+and immutable caching for fingerprinted assets.
+
 ## Project notes
 
 There is no telemetry, remote dependency, payment flow, or user account. See
