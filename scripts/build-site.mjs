@@ -31,3 +31,4 @@ for (const name of ['index.html', 'privacy.html', 'terms.html']) {
   await writeFile(`dist/site/${name}`, html);
 }
 await cp('site/_headers', 'dist/site/_headers');
+await cp('site/staticwebapp.config.json', 'dist/site/staticwebapp.config.json');
