@@ -2,7 +2,10 @@
 
 ## Status
 
-PASS. Version `0.1.2` repairs every finding in `verification.md` and `verification-2.md`.
+FAIL in strict review 1. Version `0.1.2` passes every declared command, but the
+current review found four defects. The most important is a post-effect
+`redactResult` accessor failure that leaves only a prepared receipt and no
+outbox evidence. See `.factory/review-1.md`.
 
 The current site is live at https://agent-action-receipt.sociobot.in. The latest deployment ID is `ac08934d-8643-455b-908f-c57c95f00b02`.
 
@@ -164,5 +167,32 @@ reduced-motion, dark-mode accessibility, legal routes, designed 404,
 privacy/storage, worker offline reload, links, headers, and asset cache policy.
 The live build byte-matches the reviewed implementation artifacts.
 
-The full report is `.factory/verification-3.md`. No product-code changes were
-made during verification. No known verification gaps remain.
+The full earlier report is `.factory/verification-3.md`. No product-code
+changes were made during that verification. Its PASS conclusion is superseded
+by strict review 1 below.
+
+## Strict review 1
+
+Strict review on 2026-09-05 reviewed implementation
+`b037aaf461672ba2579fd77bd1df1e705bbbed5a` and documentation baseline
+`97802a6042a147836f49c45143762887ddbdf0f4`. Live static files match the
+reviewed build.
+
+The result is **FAIL — 4 findings and 0 untested public claims**:
+
+1. A throwing `redactResult` property accessor runs the tool but leaves only a
+   prepared receipt, violating the core receipt invariant.
+2. `verifyBundle()` throws for a malformed public key or missing receipt array
+   instead of returning failed verification.
+3. The landing page widens from 390 px to 471 px at 200% text size and clips
+   first-screen content.
+4. Whitespace-only required demo fields create a success receipt with a blank
+   tool or empty authority value.
+
+All eight claim commands and all documented clean-checkout commands passed,
+which shows that the first fault is absent from the current claim matrix.
+Fresh desktop and phone checks otherwise confirmed sample isolation, reset,
+normal/failure/outbox paths, keyboard focus, reduced motion, dark contrast,
+offline reload, route metadata, legal pages, links, response policy, and the
+designed 404. Lighthouse scored 99/100/100/100. No product code was changed.
+Full evidence is in `.factory/review-1.md`.
