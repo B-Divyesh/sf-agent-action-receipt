@@ -1,0 +1,58 @@
+[
+  {
+    "id": "receipt-invariant",
+    "claim": "Every action that runs leaves a verifiable final receipt or explicit unresolved evidence.",
+    "where": "landing failure recovery, README",
+    "test": "npm run claim:receipt-invariant",
+    "sandbox": "fault-injected result hashing, argument/result redaction, signer, final append, and outbox persistence paths"
+  },
+  {
+    "id": "private-signed-bundle",
+    "claim": "Receipts are signed and hash chained without retaining raw arguments or results.",
+    "where": "landing facts and preview, README",
+    "test": "npm run claim:private-signed-bundle",
+    "sandbox": "sample tool call with secret argument and result; verify bundle and inspect exported JSON"
+  },
+  {
+    "id": "ledger-order",
+    "claim": "Concurrent calls on one ledger produce one contiguous receipt order.",
+    "where": "landing how it works, README",
+    "test": "npm run claim:ledger-order",
+    "sandbox": "eight concurrent successful calls on one fresh in-memory ledger"
+  },
+  {
+    "id": "restart-recovery",
+    "claim": "A durable outbox can be restored and drained after a process restart.",
+    "where": "landing install and README",
+    "test": "npm run claim:restart-recovery",
+    "sandbox": "fault-injected final append followed by restore, drain, and a new action"
+  },
+  {
+    "id": "tamper-detection",
+    "claim": "Verification detects a changed receipt.",
+    "where": "landing and README",
+    "test": "npm run claim:tamper-detection",
+    "sandbox": "change a tool name in an exported bundle and verify the digest failure"
+  },
+  {
+    "id": "package-artifact",
+    "claim": "The MIT package installs and runs without a hosted service, with ESM, CommonJS, declarations, and no production dependencies.",
+    "where": "landing facts, README",
+    "test": "npm run claim:package-artifact",
+    "sandbox": "pack and install into a temporary empty project; disable network APIs; execute ESM and CommonJS consumers"
+  },
+  {
+    "id": "demo-sandbox",
+    "claim": "The browser sample is populated, resettable, and stores no sample state.",
+    "where": "landing sample action and /demo banner",
+    "test": "npm run claim:demo-sandbox",
+    "sandbox": "fresh mobile browser context; sample, outcomes, reset, storage, and request inspection"
+  },
+  {
+    "id": "offline-reload",
+    "claim": "The sample reloads offline after the first visit.",
+    "where": "/demo offline state, README",
+    "test": "npm run claim:offline-reload",
+    "sandbox": "fresh browser context; first online visit, service-worker control, then offline reload"
+  }
+]

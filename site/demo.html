@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Demo — Agent Action Receipt</title><meta name="description" content="Create and inspect a sample action receipt without saving data."><link rel="canonical" href="https://agent-action-receipt.sociobot.in/demo">
+  <meta property="og:type" content="website"><meta property="og:title" content="Demo — Agent Action Receipt"><meta property="og:description" content="Create and inspect a sample action receipt without saving data."><meta property="og:url" content="https://agent-action-receipt.sociobot.in/demo"><meta property="og:image" content="https://agent-action-receipt.sociobot.in/assets/og-receipt.png">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Demo — Agent Action Receipt"><meta name="twitter:description" content="Create and inspect a sample action receipt without saving data."><meta name="twitter:image" content="https://agent-action-receipt.sociobot.in/assets/og-receipt.png">
+  <meta name="theme-color" content="#fff9ed"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="stylesheet" href="/styles.css">
+</head>
+<body data-theme="auto" data-demo-page>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="masthead"><a class="wordmark" href="/" aria-label="Agent Action Receipt home"><span aria-hidden="true">▰</span> Agent Action Receipt</a><nav aria-label="Primary navigation"><a aria-current="page" href="/demo">Demo</a><a href="/#how">How it works</a><a href="/privacy">Privacy</a><button class="theme" type="button" aria-pressed="false" aria-label="Use dark theme"><span aria-hidden="true">◐</span></button></nav></header>
+  <aside class="demo-banner" aria-label="Demo status"><strong>Demo — sample data, nothing is saved</strong><div><button id="reset-demo" class="banner-action" type="button">Reset demo</button><a class="banner-action" href="/#install">Start for real</a></div></aside>
+  <main id="main">
+    <section class="demo section" aria-labelledby="demo-title">
+      <div class="demo-intro"><p class="eyebrow">In-memory sample</p><h1 id="demo-title">Create and inspect a sample action receipt</h1><p>A refund example is ready below. Change it to see how each outcome changes the evidence.</p></div>
+      <div class="demo-grid">
+        <form id="action-form" class="action-card">
+          <label for="tool">Tool name <span>(required)</span></label><input id="tool" name="tool" value="billing.refund" required maxlength="120" aria-describedby="tool-help"><small id="tool-help">Use 120 characters or fewer.</small>
+          <label for="authority">Authority grant <span>(required)</span></label><input id="authority" name="authority" value="refund-v3 · support case 741" required maxlength="160">
+          <label for="result">Outcome</label><select id="result" name="result"><option value="succeeded">Succeeded</option><option value="failed">Failed</option><option value="outbox">Succeeded, final write offline</option></select>
+          <button class="button primary" type="submit">Create another receipt</button>
+          <p class="form-status" id="form-status" aria-live="polite">Sample refund receipt loaded.</p>
+        </form>
+        <section class="receipt-area" aria-labelledby="output-title">
+          <h2 id="output-title">Sample receipt chain</h2>
+          <div id="receipts" class="receipts"></div><div id="verification" class="verification"></div>
+          <p class="offline-note" id="offline-note" hidden><strong>Recovery needed:</strong> the tool succeeded, but the final receipt is waiting in the outbox.</p>
+        </section>
+      </div>
+      <p class="demo-explainer">This browser preview uses hashes and sample data. The npm library adds Ed25519 signatures and durable store recovery.</p>
+      <p id="connection-status" class="connection-status" aria-live="polite"></p>
+    </section>
+  </main>
+  <footer><p>Signed action receipts for teams running agents with real tool access.</p><nav aria-label="Footer navigation"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://github.com/B-Divyesh/sf-agent-action-receipt">Source <span class="visually-hidden">(external)</span></a></nav><p>Built by Param Factory · v__VERSION__</p></footer>
+  <script src="/app.js"></script>
+</body></html>

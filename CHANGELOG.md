@@ -4,6 +4,8 @@
 
 - Pre-sign an unresolved fallback before execution so post-effect result hashing or signing failures remain explicit and verifiable.
 - Run argument redaction before execution and surface result-redaction failures without losing the signed final receipt.
+- Add the isolated one-click sample, complete site routes and metadata, high-contrast dark tokens, bounded mobile labels, and 44px targets.
+- Retire superseded service-worker caches and serve only the active shell during offline reloads.
 
 ## 0.1.1
 

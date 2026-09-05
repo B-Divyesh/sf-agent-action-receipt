@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Agent Action Receipt mark">
+  <rect width="64" height="64" rx="12" fill="#17232d"/>
+  <path d="M13 13h31l7 7v31H13z" fill="#fff9ed"/>
+  <path d="M44 13v8h7" fill="#d8e7ed"/>
+  <path d="M21 27h22M21 34h22M21 41h12" stroke="#16695a" stroke-width="4" stroke-linecap="square"/>
+  <circle cx="43" cy="43" r="8" fill="#a43d2e"/>
+  <path d="m39.5 43 2.2 2.2 4.6-5" fill="none" stroke="#fff9ed" stroke-width="2.5" stroke-linecap="square"/>
+</svg>
