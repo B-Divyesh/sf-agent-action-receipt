@@ -144,3 +144,25 @@ No package publication was attempted. The factory can publish with `npm pack` an
 - If both the receipt store and outbox store reject a write, the caller receives signed fallback evidence but must reconcile it externally.
 - Pre-signing the fallback adds one signer operation to each action.
 - Azure applies a 30-second cache policy to the deliberate custom 404 response. Normal HTML routes are no-cache, and the worker never caches missing routes.
+
+## Independent verification 3
+
+Independent QA on 2026-09-05 is **PASS** with zero findings and zero untested
+public claims. It reviewed implementation `b037aaf461672ba2579fd77bd1df1e705bbbed5a`
+and the later documentation commit
+`97802a6042a147836f49c45143762887ddbdf0f4`.
+
+From a fresh checkout, `npm ci`, `npm test`, `npm run check`, `npm run lint`,
+`npm run build`, `npm run test:consumer`, `npm run test:browser`,
+`npm run test:claims`, `npm audit --omit=dev --audit-level=high`, and
+`npm pack --dry-run` all passed. The eight declared claims passed independently.
+
+Fresh live desktop and 390 px phone contexts confirmed the first-screen job,
+audience, and sample action; populated/resettable isolated sample; normal,
+failed, outbox, invalid, boundary, and recovery paths; keyboard/focus,
+reduced-motion, dark-mode accessibility, legal routes, designed 404,
+privacy/storage, worker offline reload, links, headers, and asset cache policy.
+The live build byte-matches the reviewed implementation artifacts.
+
+The full report is `.factory/verification-3.md`. No product-code changes were
+made during verification. No known verification gaps remain.
