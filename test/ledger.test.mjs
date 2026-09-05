@@ -103,19 +103,41 @@ test('@claim:receipt-invariant every post-effect finalization path leaves verifi
     assert.equal(ledger.verify().ok, true);
   });
 
-  await t.test('a failed fallback append is saved to the durable outbox', async () => {
+  await t.test('a tool that changes state and then throws still gets fallback evidence when failure signing is offline', async () => {
+    const validSigner = await createEd25519Signer();
+    let signCalls = 0;
+    const signer = { ...validSigner, sign(message) { if (++signCalls === 3) throw new Error('KMS offline'); return validSigner.sign(message); } };
+    const ledger = createReceiptLedger({ signer, actor: 'agent' });
+    let effects = 0;
+    await assert.rejects(() => ledger.execute({
+      tool: 'send.email', authority: { grant: 'g1' }, args: {},
+      run: () => { effects++; throw new Error('provider response lost'); }
+    }), (error) => error instanceof ReceiptFinalizationError
+      && error.actionError?.message === 'provider response lost'
+      && error.receipt.status === 'unresolved');
+    assert.equal(effects, 1);
+    assert.deepEqual(ledger.entries.map((receipt) => receipt.status), ['prepared', 'unresolved']);
+    assert.equal(ledger.verify().ok, true);
+  });
+
+  await t.test('a failed fallback append survives restart and drains from the durable outbox', async () => {
     const validSigner = await createEd25519Signer('durable-fallback');
     let signCalls = 0;
     const signer = { ...validSigner, sign(message) { if (++signCalls === 3) throw new Error('KMS offline'); return validSigner.sign(message); } };
     const receipts = [];
     const durableOutbox = [];
+    let fallbackWriteOffline = true;
     const store = {
       append: async (receipt) => {
-        if (receipt.status === 'unresolved') throw new Error('receipt disk offline');
+        if (receipt.status === 'unresolved' && fallbackWriteOffline) throw new Error('receipt disk offline');
         receipts.push(receipt);
       },
       saveOutbox: async (item) => { durableOutbox.push(item); },
-      resolveOutbox: async () => {}
+      resolveOutbox: async (item) => {
+        receipts.push(item.receipt);
+        durableOutbox.splice(durableOutbox.findIndex((candidate) => candidate.receipt.id === item.receipt.id), 1);
+      },
+      load: async () => ({ receipts:[...receipts], unresolvedOutbox:[...durableOutbox] })
     };
     const ledger = createReceiptLedger({ signer, actor: 'agent', store });
     let effects = 0;
@@ -128,6 +150,15 @@ test('@claim:receipt-invariant every post-effect finalization path leaves verifi
     assert.equal(durableOutbox.length, 1);
     assert.equal(ledger.unresolved.length, 1);
     assert.equal(ledger.verify().ok, true);
+
+    const restored = await ReceiptLedger.restore({ signer, actor:'agent', store });
+    assert.deepEqual(restored.entries.map((receipt) => receipt.status), ['prepared']);
+    assert.equal(restored.unresolved.length, 1);
+    fallbackWriteOffline = false;
+    assert.equal(await restored.drainOutbox(), 1);
+    assert.equal(durableOutbox.length, 0);
+    assert.deepEqual(restored.entries.map((receipt) => receipt.status), ['prepared', 'unresolved']);
+    assert.equal(restored.verify().ok, true);
   });
 
   await t.test('a failed fallback and outbox write returns the signed evidence to the caller', async () => {
