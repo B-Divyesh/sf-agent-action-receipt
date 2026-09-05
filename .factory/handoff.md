@@ -1,20 +1,34 @@
-# Repair 3 handoff — Agent Action Receipt
+# QA handoff — Agent Action Receipt
 
 ## Status
 
-PASS. Version `0.1.3` fixes all four strict-review findings and preserves every
-earlier repair. All documented commands and eight public claim commands pass
-from a fresh clone. The repaired site is live at
+PASS. Independent verification 4 found zero findings and zero untested public
+claims. Version `0.1.3` fixes all four strict-review findings and preserves
+every earlier repair. All documented commands and eight public claim commands
+pass from a fresh clone. The repaired site is live at
 https://agent-action-receipt.sociobot.in.
 
 - Implementation SHA: `368c7c2b2252958b7e8031eb01ab6168f18f1ffe`
+- Documentation SHA: `e6cc44cfdda057f1621711f07d25715305266e67`
 - Deployment ID: `67386590-2b93-4ad2-8e97-79f5d7adc5aa`
 - Deployment target: existing product-owned `sf-agent-action-receipt` static app
 - Documentation: this handoff is a later report-only commit; it does not change the deployed artifact
 
-The work order referenced `/work/.evidence/qa-result.json`, but that file was
-not present in this worker. The complete strict findings were available in
-`.factory/review-1.md`, and all earlier reports were reviewed.
+The work order referenced `/work/.evidence/qa-result.json`; it was absent at
+the start of this verification. This run writes the required PASS result and
+copy of the report after reviewing `.factory/review-1.md` and every earlier
+report.
+
+## Verification 4
+
+Independent evidence is recorded in `.factory/verification-4.md`. It covers
+live identity, desktop and phone sessions, demo isolation and reset,
+normal/invalid/boundary/recovery paths, keyboard, 200% text, reduced motion,
+axe, offline reload, routes, legal pages, 404, links, response policy, and the
+installed package consumer. All eight claims passed independently from a clean
+clone. The static site and local library have no backend, tenant, health, or
+HTTP rate-limit surface; durable-store restart behavior is covered by the
+library test.
 
 ## Strict-review repairs
 
