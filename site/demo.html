@@ -17,7 +17,7 @@
       <div class="demo-grid">
         <form id="action-form" class="action-card">
           <label for="tool">Tool name <span>(required)</span></label><input id="tool" name="tool" value="billing.refund" required maxlength="120" aria-describedby="tool-help"><small id="tool-help">Use 120 characters or fewer.</small>
-          <label for="authority">Authority grant <span>(required)</span></label><input id="authority" name="authority" value="refund-v3 · support case 741" required maxlength="160">
+          <label for="authority">Authority grant <span>(required)</span></label><input id="authority" name="authority" value="refund-v3 · support case 741" required maxlength="160" aria-describedby="authority-help"><small id="authority-help">Use 160 characters or fewer. Spaces alone do not count.</small>
           <label for="result">Outcome</label><select id="result" name="result"><option value="succeeded">Succeeded</option><option value="failed">Failed</option><option value="outbox">Succeeded, final write offline</option></select>
           <button class="button primary" type="submit">Create another receipt</button>
           <p class="form-status" id="form-status" aria-live="polite">Sample refund receipt loaded.</p>

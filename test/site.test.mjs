@@ -90,6 +90,27 @@ test('landing and every public route provide the documented structure, metadata,
   await context.close();
 });
 
+test('landing content reflows within a phone viewport at 200 percent text size', async () => {
+  const context = await browser.newContext({ viewport:{ width:390, height:844 }, colorScheme:'light' });
+  const page = await context.newPage();
+  const errors = watchErrors(page);
+  await page.goto(`${origin}/`, { waitUntil:'networkidle' });
+  await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+  const layout = await page.evaluate(() => ({
+    viewport:document.documentElement.clientWidth,
+    content:document.documentElement.scrollWidth,
+    keyElements:['h1', '.lede', '.primary-action', '.diorama'].map((selector) => {
+      const bounds = document.querySelector(selector).getBoundingClientRect();
+      return { selector, left:bounds.left, right:bounds.right };
+    })
+  }));
+  assert.equal(layout.viewport, 390);
+  assert.equal(layout.content, layout.viewport);
+  assert.deepEqual(layout.keyElements.filter((item) => item.left < 0 || item.right > layout.viewport), []);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
 test('@claim:demo-sandbox the one-click sample is populated, isolated, resettable, keyboard usable, and mobile safe', async () => {
   const context = await browser.newContext({ viewport:{ width:390, height:844 }, colorScheme:'dark' });
   const requests = [];
@@ -119,6 +140,27 @@ test('@claim:demo-sandbox the one-click sample is populated, isolated, resettabl
   assert.equal(await page.locator('#tool').inputValue(), 'billing.refund');
   assert.match(await page.locator('#form-status').textContent(), /Sample restored/);
 
+  await page.locator('#tool').fill('   ');
+  await page.locator('#action-form').evaluate((form) => form.requestSubmit());
+  assert.equal(await page.locator('.receipt').count(), 2);
+  assert.equal(await page.evaluate(() => document.activeElement?.id), 'tool');
+  assert.equal(await page.locator('#tool').getAttribute('aria-invalid'), 'true');
+  assert.match(await page.locator('#form-status').textContent(), /tool name.*Spaces alone/);
+
+  await page.locator('#tool').fill('billing.refund');
+  await page.locator('#authority').fill('   ');
+  await page.locator('#action-form').evaluate((form) => form.requestSubmit());
+  assert.equal(await page.locator('.receipt').count(), 2);
+  assert.equal(await page.evaluate(() => document.activeElement?.id), 'authority');
+  assert.equal(await page.locator('#authority').getAttribute('aria-invalid'), 'true');
+  assert.match(await page.locator('#form-status').textContent(), /authority grant.*Spaces alone/);
+
+  await page.locator('#authority').fill('refund-v3 · support case 741');
+  await page.locator('#action-form').evaluate((form) => form.requestSubmit());
+  assert.equal(await page.locator('.receipt').count(), 4);
+  assert.match(await page.locator('#form-status').textContent(), /Success receipt created/);
+
+  await page.locator('#reset-demo').click();
   await page.locator('#result').selectOption('failed');
   await page.locator('#action-form').evaluate((form) => form.requestSubmit());
   assert.match(await page.locator('#form-status').textContent(), /Failure receipt created/);

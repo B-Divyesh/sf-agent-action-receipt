@@ -45,6 +45,8 @@ if (form) {
   const resetButton = document.querySelector('#reset-demo');
   const submitButton = form.querySelector('button[type="submit"]');
   const connectionStatus = document.querySelector('#connection-status');
+  const toolInput = form.elements.namedItem('tool');
+  const authorityInput = form.elements.namedItem('authority');
   const seed = [
     { sequence:41, tool:'billing.refund', state:'prepared', authority:'8f2a…d91c', hash:'1bb82607a7149d3d50d55e9649b6e5c85cfa78dc99a07b83ec3a123a34d6a042', previous:'6d0f79a4508d48a1d6fe429635fbcd82aa1a5d8310ced1f68a31bb51fc5d982a' },
     { sequence:42, tool:'billing.refund', state:'succeeded', result:'a10e…77b1', hash:'f8cd843d365b5825967a868ecb5b3102ba34c62db10be81ee5d2c59f167811e9', previous:'1bb82607a7149d3d50d55e9649b6e5c85cfa78dc99a07b83ec3a123a34d6a042' }
@@ -109,13 +111,40 @@ if (form) {
     chain = seed.map((receipt) => ({ ...receipt }));
     unresolved = null;
     form.reset();
+    for (const input of [toolInput, authorityInput]) {
+      input.setCustomValidity('');
+      input.removeAttribute('aria-invalid');
+    }
     status.textContent = 'Sample restored. No data was saved.';
     render();
   };
 
+  const validateRequiredText = (input, label) => {
+    const valid = input.value.trim().length > 0;
+    input.setCustomValidity(valid ? '' : `Enter ${label}. Spaces alone do not count.`);
+    if (valid) input.removeAttribute('aria-invalid');
+    else input.setAttribute('aria-invalid', 'true');
+    return valid;
+  };
+
+  for (const [input, label] of [[toolInput, 'a tool name'], [authorityInput, 'an authority grant']]) {
+    input.addEventListener('input', () => validateRequiredText(input, label));
+    input.addEventListener('invalid', () => {
+      validateRequiredText(input, label);
+      status.textContent = `Enter ${label}. Spaces alone do not count.`;
+    });
+  }
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!form.reportValidity()) return;
+    const toolIsValid = validateRequiredText(toolInput, 'a tool name');
+    const authorityIsValid = validateRequiredText(authorityInput, 'an authority grant');
+    if (!form.reportValidity() || !toolIsValid || !authorityIsValid) {
+      status.textContent = toolIsValid
+        ? 'Enter an authority grant. Spaces alone do not count.'
+        : 'Enter a tool name. Spaces alone do not count.';
+      return;
+    }
     const data = new FormData(form);
     const tool = String(data.get('tool')).trim();
     const authority = String(data.get('authority')).trim();

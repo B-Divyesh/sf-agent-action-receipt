@@ -1,4 +1,4 @@
-import { createHash, generateKeyPairSync, randomUUID, sign, verify } from 'node:crypto';
+import { createHash, createPublicKey, generateKeyPairSync, randomUUID, sign, verify, type KeyObject } from 'node:crypto';
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 export type ReceiptStatus = 'prepared' | 'succeeded' | 'failed' | 'unresolved';
@@ -198,10 +198,10 @@ function signReceipt(unsigned: UnsignedReceipt, signer: Signer): Receipt {
   return { ...unsigned, hash, signature };
 }
 
-function verifyReceipt(receipt: Receipt, publicKeyPem: string): string | undefined {
+function verifyReceipt(receipt: Receipt, publicKey: KeyObject): string | undefined {
   const { hash, signature, ...unsigned } = receipt;
   if (receiptDigest(unsigned) !== hash) return `receipt ${receipt.sequence}: digest mismatch`;
-  const signatureOk = verify(null, Buffer.from(hash, 'utf8'), publicKeyPem, Buffer.from(signature, 'base64'));
+  const signatureOk = verify(null, Buffer.from(hash, 'utf8'), publicKey, Buffer.from(signature, 'base64'));
   if (!signatureOk) return `receipt ${receipt.sequence}: signature mismatch`;
   return undefined;
 }
@@ -248,11 +248,15 @@ export class ReceiptLedger {
 
   private async executeInOrder<Args extends Json, Result extends Json>(options: ExecuteOptions<Args, Result>): Promise<ExecuteResult<Result>> {
     if (this.outbox.length) throw new Error('Cannot execute while final receipt outbox is unresolved; drainOutbox first');
-    if (!options.tool.trim()) throw new TypeError('tool is required');
+
+    // Read every caller-controlled property before execution. Accessor failures
+    // can then stop the action instead of escaping after its side effect.
+    const { tool, authority, externalWitness, args, redact, redactResult, run } = options;
+    if (!tool.trim()) throw new TypeError('tool is required');
     let redactedArgs: Json | undefined;
-    if (options.redact) {
+    if (redact) {
       try {
-        redactedArgs = validateRedaction(options.redact(options.args));
+        redactedArgs = validateRedaction(redact(args));
       } catch (cause) {
         throw new TypeError(`Argument redaction failed before tool execution: ${errorMessage(cause)}`, { cause });
       }
@@ -260,10 +264,10 @@ export class ReceiptLedger {
     const actionId = randomUUID();
     const base = {
       actionId,
-      tool: options.tool,
-      authorityHash: sha256(options.authority),
-      argsHash: sha256(options.args),
-      ...(options.externalWitness === undefined ? {} : { witnessHash: sha256(options.externalWitness) })
+      tool,
+      authorityHash: sha256(authority),
+      argsHash: sha256(args),
+      ...(externalWitness === undefined ? {} : { witnessHash: sha256(externalWitness) })
     };
     const prepared = this.makeReceipt({ ...base, status: 'prepared' });
     // This is signed before the tool runs. If exact result finalization later
@@ -277,7 +281,7 @@ export class ReceiptLedger {
 
     let result: Result;
     try {
-      result = await options.run();
+      result = await run();
     } catch (cause) {
       let finalReceipt: Receipt;
       try {
@@ -306,9 +310,9 @@ export class ReceiptLedger {
 
     const redactionWarnings: string[] = [];
     let redactedResult: Json | undefined;
-    if (options.redactResult) {
+    if (redactResult) {
       try {
-        redactedResult = validateRedaction(options.redactResult(result));
+        redactedResult = validateRedaction(redactResult(result));
       } catch (cause) {
         redactionWarnings.push(`Result redaction was omitted: ${errorMessage(cause)}`);
       }
@@ -450,27 +454,75 @@ export function createReceiptLedger(options: ConstructorParameters<typeof Receip
 }
 
 /** Verifies hashes, Ed25519 signatures, sequence ordering, and any explicit unresolved outbox receipt. */
-export function verifyBundle(bundle: ReceiptBundle): VerificationResult {
-  if (bundle.version !== 1) return { ok: false, checked: 0, error: 'Unsupported bundle version' };
-  let previousHash: string | null = null;
-  let expectedSequence = 1;
-  const check = (receipt: Receipt): string | undefined => {
-    if (receipt.sequence !== expectedSequence++) return `receipt ${receipt.sequence}: sequence is not contiguous`;
-    if (receipt.previousHash !== previousHash) return `receipt ${receipt.sequence}: previous hash mismatch`;
-    const failure = verifyReceipt(receipt, bundle.publicKeyPem);
-    if (failure) return failure;
-    previousHash = receipt.hash;
-    return undefined;
-  };
-  for (const receipt of bundle.receipts) {
-    const failure = check(receipt);
-    if (failure) return { ok: false, checked: expectedSequence - 1, error: failure };
+export function verifyBundle(bundle: unknown): VerificationResult {
+  let checked = 0;
+  try {
+    if (!isRecord(bundle)) return invalidBundle('bundle must be an object', checked);
+    if (bundle.version !== 1) return { ok: false, checked, error: 'Unsupported bundle version' };
+    if (typeof bundle.publicKeyPem !== 'string' || !bundle.publicKeyPem.trim()) {
+      return invalidBundle('publicKeyPem must be a non-empty string', checked);
+    }
+    if (!Array.isArray(bundle.receipts)) return invalidBundle('receipts must be an array', checked);
+    if (!Array.isArray(bundle.unresolvedOutbox)) return invalidBundle('unresolvedOutbox must be an array', checked);
+
+    const publicKey = createPublicKey(bundle.publicKeyPem);
+    if (publicKey.asymmetricKeyType !== 'ed25519') return invalidBundle('publicKeyPem must contain an Ed25519 public key', checked);
+
+    let previousHash: string | null = null;
+    let expectedSequence = 1;
+    const check = (value: unknown): string | undefined => {
+      const shapeError = receiptShapeError(value);
+      if (shapeError) return `receipt ${expectedSequence}: ${shapeError}`;
+      const receipt = value as Receipt;
+      if (receipt.sequence !== expectedSequence) return `receipt ${receipt.sequence}: sequence is not contiguous`;
+      if (receipt.previousHash !== previousHash) return `receipt ${receipt.sequence}: previous hash mismatch`;
+      const failure = verifyReceipt(receipt, publicKey);
+      if (failure) return failure;
+      previousHash = receipt.hash;
+      expectedSequence++;
+      checked++;
+      return undefined;
+    };
+
+    for (const receipt of bundle.receipts) {
+      const failure = check(receipt);
+      if (failure) return { ok: false, checked, error: failure };
+    }
+    for (const value of bundle.unresolvedOutbox) {
+      if (!isRecord(value) || typeof value.reason !== 'string' || typeof value.createdAt !== 'string' || !('receipt' in value)) {
+        return invalidBundle('outbox item has an invalid shape', checked);
+      }
+      const failure = check(value.receipt);
+      if (failure) return { ok: false, checked, error: `outbox ${failure}` };
+    }
+    return { ok: true, checked };
+  } catch (cause) {
+    return invalidBundle(errorMessage(cause), checked);
   }
-  for (const item of bundle.unresolvedOutbox) {
-    const failure = check(item.receipt);
-    if (failure) return { ok: false, checked: expectedSequence - 1, error: `outbox ${failure}` };
+}
+
+function invalidBundle(reason: string, checked: number): VerificationResult {
+  return { ok: false, checked, error: `Invalid bundle: ${reason}` };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function receiptShapeError(value: unknown): string | undefined {
+  if (!isRecord(value)) return 'entry must be an object';
+  if (value.version !== 1) return 'version must be 1';
+  if (!Number.isSafeInteger(value.sequence) || (value.sequence as number) < 1) return 'sequence must be a positive safe integer';
+  for (const field of ['id', 'actionId', 'at', 'actor', 'tool', 'authorityHash', 'argsHash', 'hash', 'signature'] as const) {
+    if (typeof value[field] !== 'string') return `${field} must be a string`;
   }
-  return { ok: true, checked: expectedSequence - 1 };
+  if (value.previousHash !== null && typeof value.previousHash !== 'string') return 'previousHash must be a string or null';
+  if (!['prepared', 'succeeded', 'failed', 'unresolved'].includes(String(value.status))) return 'status is invalid';
+  for (const field of ['witnessHash', 'resultHash', 'errorHash'] as const) {
+    if (value[field] !== undefined && typeof value[field] !== 'string') return `${field} must be a string when present`;
+  }
+  if (value.redactions !== undefined && !isRecord(value.redactions)) return 'redactions must be an object when present';
+  return undefined;
 }
 
 function safeRedactions(args?: Json, result?: Json): { args?: Json; result?: Json } | undefined {

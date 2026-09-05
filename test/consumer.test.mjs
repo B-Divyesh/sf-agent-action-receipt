@@ -46,6 +46,20 @@ test('@claim:package-artifact the packed package installs for ESM and CommonJS w
       assert.equal(redacted.receipt.status, 'succeeded');
       assert.equal(redactionLedger.verify().ok, true);
 
+      const accessorLedger = createReceiptLedger({ signer, actor:'deploy-agent' });
+      let accessorEffects = 0;
+      const accessorOptions = { tool:'mail.send', authority:{ grant:'g' }, args:{}, run:() => { accessorEffects++; return { ok:true }; } };
+      Object.defineProperty(accessorOptions, 'redactResult', { get() { throw new Error('redactResult getter crashed'); } });
+      await assert.rejects(() => accessorLedger.execute(accessorOptions), /redactResult getter crashed/);
+      assert.equal(accessorEffects, 0);
+      assert.equal(accessorLedger.entries.length, 0);
+
+      const malformedKey = verifyBundle({ ...ledger.exportBundle(), publicKeyPem:'not a PEM key' });
+      assert.equal(malformedKey.ok, false);
+      const { receipts: ignored, ...missingReceipts } = ledger.exportBundle();
+      const malformedShape = verifyBundle(missingReceipts);
+      assert.equal(malformedShape.ok, false);
+
       const invalidLedger = createReceiptLedger({ signer, actor:'deploy-agent' });
       let invalidEffects = 0;
       await assert.rejects(() => invalidLedger.execute({ tool:'mail.send', authority:{ grant:'g' }, args:{}, run:() => { invalidEffects++; return Number.NaN; } }), (error) => error instanceof ReceiptFinalizationError);

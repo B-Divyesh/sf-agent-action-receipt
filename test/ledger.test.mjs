@@ -58,6 +58,23 @@ test('@claim:receipt-invariant every post-effect finalization path leaves verifi
     assert.equal(ledger.verify().ok, true);
   });
 
+  await t.test('a throwing result-redactor accessor prevents the action', async () => {
+    const signer = await createEd25519Signer();
+    const ledger = createReceiptLedger({ signer, actor: 'agent' });
+    let effects = 0;
+    const options = {
+      tool: 'send.email', authority: { grant: 'g1' }, args: { to: 'a@example.test' },
+      run: () => { effects++; return { accepted: true }; }
+    };
+    Object.defineProperty(options, 'redactResult', {
+      get() { throw new Error('result redactor accessor crashed'); }
+    });
+    await assert.rejects(() => ledger.execute(options), /result redactor accessor crashed/);
+    assert.equal(effects, 0);
+    assert.equal(ledger.entries.length, 0);
+    assert.equal(ledger.unresolved.length, 0);
+  });
+
   await t.test('an invalid runtime result appends the pre-signed unresolved receipt', async () => {
     const signer = await createEd25519Signer();
     const ledger = createReceiptLedger({ signer, actor: 'agent' });
@@ -249,13 +266,37 @@ test('@claim:restart-recovery durable outbox survives restart and drains into th
   assert.equal(recovered.verify().ok, true);
 });
 
-test('@claim:tamper-detection tampering with a receipt is detected', async () => {
+test('@claim:tamper-detection changed and malformed bundles return failed verification without throwing', async (t) => {
   const signer = await createEd25519Signer();
   const ledger = createReceiptLedger({ signer, actor: 'agent' });
   await ledger.execute({ tool: 'deploy', authority: {}, args: { version: '1' }, run: () => ({ ok: true }) });
   const bundle = ledger.exportBundle();
-  bundle.receipts[1].tool = 'delete-production';
-  const checked = verifyBundle(bundle);
-  assert.equal(checked.ok, false);
-  assert.match(checked.error, /digest mismatch/);
+
+  const failedWithoutThrowing = (value, errorPattern) => {
+    let checked;
+    assert.doesNotThrow(() => { checked = verifyBundle(value); });
+    assert.equal(checked.ok, false);
+    assert.match(checked.error, errorPattern);
+  };
+
+  await t.test('changed signed content fails its digest check', () => {
+    const changed = structuredClone(bundle);
+    changed.receipts[1].tool = 'delete-production';
+    failedWithoutThrowing(changed, /digest mismatch/);
+  });
+
+  await t.test('an invalid public key returns a failed result', () => {
+    failedWithoutThrowing({ ...bundle, publicKeyPem: 'not a PEM key' }, /Invalid bundle/);
+  });
+
+  await t.test('a missing receipt array returns a failed result', () => {
+    const { receipts: _receipts, ...withoutReceipts } = bundle;
+    failedWithoutThrowing(withoutReceipts, /receipts must be an array/);
+  });
+
+  await t.test('invalid root, receipt, and outbox shapes return failed results', () => {
+    failedWithoutThrowing(null, /bundle must be an object/);
+    failedWithoutThrowing({ ...bundle, receipts: [null] }, /entry must be an object/);
+    failedWithoutThrowing({ ...bundle, unresolvedOutbox: [null] }, /outbox item has an invalid shape/);
+  });
 });

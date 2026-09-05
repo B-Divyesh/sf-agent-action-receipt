@@ -55,6 +55,8 @@ If fallback append also fails, the ledger saves the fallback in the outbox. Its 
 
 A result-redaction callback cannot block the signed result. Its error appears in `redactionWarnings`, and the redacted view is omitted.
 
+The ledger reads every execution option before calling `run`. A throwing property accessor therefore prevents the tool from running.
+
 Argument redaction runs before the tool. A failed argument redaction therefore prevents the action.
 
 ## Restore a durable outbox
@@ -91,7 +93,7 @@ const bundle = ledger.exportBundle({ includeRedactions: true });
 const verification = verifyBundle(bundle);
 ```
 
-The verifier checks receipt hashes, Ed25519 signatures, sequence order, chain links, and unresolved outbox entries.
+The verifier checks receipt hashes, Ed25519 signatures, sequence order, chain links, and unresolved outbox entries. Malformed input returns `{ ok: false }` instead of throwing.
 
 Redacted views are optional presentation data. They are excluded from the signature and exported only when requested.
 

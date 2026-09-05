@@ -1,6 +1,6 @@
 {
   "name": "@sociobot/agent-action-receipt",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Signed, privacy-preserving hash-chain receipts for consequential agent tool calls.",
   "license": "MIT",
   "type": "module",

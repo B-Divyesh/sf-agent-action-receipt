@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.3
+
+- Read all execution options before a tool runs so a throwing property accessor cannot bypass final evidence.
+- Return failed verification results for malformed bundles and invalid public keys instead of throwing.
+- Keep the landing page within the viewport at 200% text size.
+- Reject whitespace-only tool and authority fields in the browser sample.
+
 ## 0.1.2
 
 - Pre-sign an unresolved fallback before execution so post-effect result hashing or signing failures remain explicit and verifiable.

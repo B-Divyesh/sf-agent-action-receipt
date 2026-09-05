@@ -4,7 +4,7 @@
     "claim": "Every action that runs leaves a verifiable final receipt or explicit unresolved evidence.",
     "where": "landing failure recovery, README",
     "test": "npm run claim:receipt-invariant",
-    "sandbox": "fault-injected result hashing, argument/result redaction, signer, final append, and outbox persistence paths"
+    "sandbox": "fault-injected result hashing, argument/result redaction and accessor, signer, final append, and outbox persistence paths"
   },
   {
     "id": "private-signed-bundle",
@@ -29,10 +29,10 @@
   },
   {
     "id": "tamper-detection",
-    "claim": "Verification detects a changed receipt.",
+    "claim": "Verification reports changed or malformed bundles without throwing.",
     "where": "landing and README",
     "test": "npm run claim:tamper-detection",
-    "sandbox": "change a tool name in an exported bundle and verify the digest failure"
+    "sandbox": "change a tool name, remove required bundle data, and replace the public key; assert failed results without exceptions"
   },
   {
     "id": "package-artifact",
