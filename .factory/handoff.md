@@ -157,6 +157,22 @@ feature was added.
 The catalog description is verb-first, 82 characters, and copied to
 `/work/.evidence/catalog-description.txt`.
 
+## Strict review 2
+
+Strict review 2 is a fresh PASS with zero findings and zero untested public
+claims. It reviewed implementation `368c7c2b2252958b7e8031eb01ab6168f18f1ffe`
+against documentation baseline `b660c6f7ce17e194f37b36f4b3408118f4d2df25`.
+The baseline changes only reports. Live HTML, demo, JavaScript, and CSS
+byte-match a clean build from the implementation candidate.
+
+The reviewer repeated every documented clean-checkout command, all eight claim
+commands, the package-consumer exercise, fresh desktop and phone sessions,
+sample isolation/reset, normal/invalid/boundary/recovery flows, keyboard,
+200% text, reduced motion, axe, legal/404 routes, links, privacy requests,
+headers, and fresh-context offline reload. All passed. Details are in
+`.factory/review-2.md`; required evidence is copied to
+`/work/.evidence/qa-report.md` and `/work/.evidence/qa-result.json`.
+
 ## Known limits
 
 - A library cannot atomically commit an arbitrary remote side effect and caller-owned receipt storage.
