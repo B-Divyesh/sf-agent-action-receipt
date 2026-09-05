@@ -1,7 +1,7 @@
 import { createHash, generateKeyPairSync, randomUUID, sign, verify } from 'node:crypto';
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
-export type ReceiptStatus = 'prepared' | 'succeeded' | 'failed';
+export type ReceiptStatus = 'prepared' | 'succeeded' | 'failed' | 'unresolved';
 
 export interface Signer {
   /** Stable identifier for the verification key, for key rotation and lookup. */
@@ -76,6 +76,8 @@ export interface ExecuteResult<Result> {
   receipt: Receipt;
   /** Present when the side effect completed but final persistence did not. */
   unresolvedOutbox?: OutboxItem;
+  /** Optional presentation data that could not be produced; receipt evidence is still complete. */
+  redactionWarnings?: readonly string[];
 }
 
 export interface ReceiptBundle {
@@ -124,6 +126,32 @@ export class OutboxPersistenceError extends Error {
     this.receipt = receipt;
     this.finalWriteError = finalWriteError;
     this.outboxWriteError = outboxWriteError;
+  }
+}
+
+/**
+ * The tool returned or threw, but its exact outcome could not be signed. The
+ * attached pre-signed unresolved receipt is either in the chain, in the durable
+ * outbox, or available for operator reconciliation through `persistenceError`.
+ */
+export class ReceiptFinalizationError extends Error {
+  readonly receipt: Receipt;
+  readonly unresolvedOutbox?: OutboxItem;
+  readonly actionError?: unknown;
+  readonly persistenceError?: OutboxPersistenceError;
+
+  constructor(cause: unknown, receipt: Receipt, options: {
+    unresolvedOutbox?: OutboxItem;
+    actionError?: unknown;
+    persistenceError?: OutboxPersistenceError;
+  } = {}) {
+    super(`Action outcome could not be finalized: ${errorMessage(cause)}`);
+    this.name = 'ReceiptFinalizationError';
+    this.cause = cause;
+    this.receipt = receipt;
+    this.unresolvedOutbox = options.unresolvedOutbox;
+    this.actionError = options.actionError;
+    this.persistenceError = options.persistenceError;
   }
 }
 
@@ -221,6 +249,14 @@ export class ReceiptLedger {
   private async executeInOrder<Args extends Json, Result extends Json>(options: ExecuteOptions<Args, Result>): Promise<ExecuteResult<Result>> {
     if (this.outbox.length) throw new Error('Cannot execute while final receipt outbox is unresolved; drainOutbox first');
     if (!options.tool.trim()) throw new TypeError('tool is required');
+    let redactedArgs: Json | undefined;
+    if (options.redact) {
+      try {
+        redactedArgs = validateRedaction(options.redact(options.args));
+      } catch (cause) {
+        throw new TypeError(`Argument redaction failed before tool execution: ${errorMessage(cause)}`, { cause });
+      }
+    }
     const actionId = randomUUID();
     const base = {
       actionId,
@@ -230,13 +266,25 @@ export class ReceiptLedger {
       ...(options.externalWitness === undefined ? {} : { witnessHash: sha256(options.externalWitness) })
     };
     const prepared = this.makeReceipt({ ...base, status: 'prepared' });
+    // This is signed before the tool runs. If exact result finalization later
+    // fails, it can still make the action explicit without another KMS call.
+    const unresolvedFallback = this.makeReceiptAfter(prepared, {
+      ...base,
+      status: 'unresolved',
+      errorHash: sha256({ name: 'ReceiptFinalizationError', message: 'The action outcome could not be finalized' })
+    });
     await this.persistFinal(prepared);
 
     let result: Result;
     try {
       result = await options.run();
     } catch (cause) {
-      const finalReceipt = this.makeReceipt({ ...base, status: 'failed', errorHash: sha256(errorView(cause)) });
+      let finalReceipt: Receipt;
+      try {
+        finalReceipt = this.makeReceipt({ ...base, status: 'failed', errorHash: sha256(errorView(cause)) });
+      } catch (finalizationCause) {
+        return this.recoverFinalization(unresolvedFallback, finalizationCause, cause);
+      }
       try {
         const unresolvedOutbox = await this.tryPersistFinal(finalReceipt);
         throw new ToolExecutionError(cause, finalReceipt, unresolvedOutbox);
@@ -249,14 +297,41 @@ export class ReceiptLedger {
       }
     }
 
-    const finalReceipt = this.makeReceipt({
-      ...base,
-      status: 'succeeded',
-      resultHash: sha256(result),
-      redactions: safeRedactions(options.redact?.(options.args), options.redactResult?.(result))
-    });
+    let resultHash: string;
+    try {
+      resultHash = sha256(result);
+    } catch (cause) {
+      return this.recoverFinalization(unresolvedFallback, cause);
+    }
+
+    const redactionWarnings: string[] = [];
+    let redactedResult: Json | undefined;
+    if (options.redactResult) {
+      try {
+        redactedResult = validateRedaction(options.redactResult(result));
+      } catch (cause) {
+        redactionWarnings.push(`Result redaction was omitted: ${errorMessage(cause)}`);
+      }
+    }
+
+    let finalReceipt: Receipt;
+    try {
+      finalReceipt = this.makeReceipt({
+        ...base,
+        status: 'succeeded',
+        resultHash,
+        redactions: safeRedactions(redactedArgs, redactedResult)
+      });
+    } catch (cause) {
+      return this.recoverFinalization(unresolvedFallback, cause);
+    }
     const unresolvedOutbox = await this.tryPersistFinal(finalReceipt);
-    return { result, receipt: finalReceipt, ...(unresolvedOutbox ? { unresolvedOutbox } : {}) };
+    return {
+      result,
+      receipt: finalReceipt,
+      ...(unresolvedOutbox ? { unresolvedOutbox } : {}),
+      ...(redactionWarnings.length ? { redactionWarnings } : {})
+    };
   }
 
   async drainOutbox(): Promise<number> {
@@ -301,10 +376,14 @@ export class ReceiptLedger {
 
   private makeReceipt(fields: Omit<UnsignedReceipt, 'version' | 'id' | 'sequence' | 'at' | 'actor' | 'previousHash'>): Receipt {
     const previous = this.receipts[this.receipts.length - 1];
+    return this.makeReceiptAfter(previous, fields);
+  }
+
+  private makeReceiptAfter(previous: Receipt | undefined, fields: Omit<UnsignedReceipt, 'version' | 'id' | 'sequence' | 'at' | 'actor' | 'previousHash'>): Receipt {
     return signReceipt({
       version: 1,
       id: randomUUID(),
-      sequence: this.receipts.length + 1,
+      sequence: (previous?.sequence ?? 0) + 1,
       at: new Date().toISOString(),
       actor: this.actor,
       previousHash: previous?.hash ?? null,
@@ -322,15 +401,41 @@ export class ReceiptLedger {
       await this.persistFinal(receipt);
       return undefined;
     } catch (finalWriteError) {
-      const item = { receipt, reason: finalWriteError instanceof Error ? finalWriteError.message : String(finalWriteError), createdAt: new Date().toISOString() };
-      try {
-        if (this.store) await this.store.saveOutbox(item);
-      } catch (outboxWriteError) {
-        throw new OutboxPersistenceError(receipt, finalWriteError, outboxWriteError);
-      }
-      this.outbox.push(item);
-      return item;
+      return this.persistOutbox(receipt, errorMessage(finalWriteError), finalWriteError);
     }
+  }
+
+  private async recoverFinalization(fallback: Receipt, cause: unknown, actionError?: unknown): Promise<never> {
+    try {
+      await this.persistFinal(fallback);
+    } catch (finalWriteError) {
+      try {
+        const unresolvedOutbox = await this.persistOutbox(
+          fallback,
+          `Outcome finalization failed (${errorMessage(cause)}); final receipt write failed (${errorMessage(finalWriteError)})`,
+          finalWriteError
+        );
+        throw new ReceiptFinalizationError(cause, fallback, { unresolvedOutbox, actionError });
+      } catch (outboxWriteError) {
+        if (outboxWriteError instanceof ReceiptFinalizationError) throw outboxWriteError;
+        const persistenceError = outboxWriteError instanceof OutboxPersistenceError
+          ? outboxWriteError
+          : new OutboxPersistenceError(fallback, finalWriteError, outboxWriteError);
+        throw new ReceiptFinalizationError(cause, fallback, { actionError, persistenceError });
+      }
+    }
+    throw new ReceiptFinalizationError(cause, fallback, { actionError });
+  }
+
+  private async persistOutbox(receipt: Receipt, reason: string, finalWriteError: unknown): Promise<OutboxItem> {
+    const item = { receipt, reason, createdAt: new Date().toISOString() };
+    try {
+      if (this.store) await this.store.saveOutbox(item);
+    } catch (outboxWriteError) {
+        throw new OutboxPersistenceError(receipt, finalWriteError, outboxWriteError);
+    }
+    this.outbox.push(item);
+    return item;
   }
 
   private serialize<T>(operation: () => Promise<T>): Promise<T> {
@@ -373,6 +478,19 @@ function safeRedactions(args?: Json, result?: Json): { args?: Json; result?: Jso
   return Object.keys(redactions).length ? redactions : undefined;
 }
 
+function validateRedaction(value: Json | undefined): Json | undefined {
+  if (value !== undefined) canonicalJson(value);
+  return value;
+}
+
 function errorView(error: unknown): Json {
   return { name: error instanceof Error ? error.name : 'Error', message: error instanceof Error ? error.message : String(error) };
+}
+
+function errorMessage(error: unknown): string {
+  try {
+    return error instanceof Error ? error.message : String(error);
+  } catch {
+    return 'unknown error';
+  }
 }
